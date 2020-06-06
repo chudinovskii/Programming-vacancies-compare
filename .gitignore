@@ -1,3 +1,4 @@
 
 *.xml
 .idea/programming_vacancies_compare.iml
+.env

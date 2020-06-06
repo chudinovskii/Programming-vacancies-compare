@@ -23,10 +23,10 @@ def get_vacancies_hh(text, page=0, per_page=100):
     return decoded_resp
 
 
-def get_vacancies_sj(text, page=0, count=100):
+def get_vacancies_sj(secret_key, text, page=0, count=100):
     url = 'https://api.superjob.ru/2.0/vacancies/'
     headers = {
-        'X-Api-App-Id': os.getenv('SUPERJOB_SECRET_KEY')
+        'X-Api-App-Id': secret_key
     }
     payload = {
         'town': 4,
@@ -106,11 +106,11 @@ def get_hh_vacancies_stats_by_lang(text):
     return vacancies_found, vacancies_processed, average_salary
 
 
-def get_sj_vacancies_stats_by_lang(text):
+def get_sj_vacancies_stats_by_lang(secret_key, text):
     pages = []
 
     for page in count(0):
-        decoded_resp = get_vacancies_sj(text, page)
+        decoded_resp = get_vacancies_sj(secret_key, text, page)
         pages.append(decoded_resp['objects'])
         if not decoded_resp['more']:
             vacancies_found = decoded_resp['total']
@@ -144,14 +144,14 @@ def get_all_hh_prog_vacancies_stats():
     return table_data, title
 
 
-def get_all_sj_prog_vacancies_stats():
+def get_all_sj_prog_vacancies_stats(secret_key):
     title = 'SuperJob Moscow'
     table_data = [
         ['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']
     ]
     for lang in LANGS:
         text = 'Программист ' + lang
-        vacancies_found, vacancies_processed, average_salary = get_sj_vacancies_stats_by_lang(text)
+        vacancies_found, vacancies_processed, average_salary = get_sj_vacancies_stats_by_lang(secret_key, text)
         table_data.append([lang, vacancies_found, vacancies_processed, average_salary])
     return table_data, title
 
@@ -163,10 +163,12 @@ def create_table(table_data, title):
 
 def main():
     load_dotenv()
-    table_data, title = get_all_sj_prog_vacancies_stats()
-    print(create_table(table_data, title))
-    table_data, title = get_all_hh_prog_vacancies_stats()
-    print(create_table(table_data, title))
+    secret_key = os.getenv('SUPERJOB_SECRET_KEY')
+    tables = [[get_all_sj_prog_vacancies_stats(secret_key)], [get_all_hh_prog_vacancies_stats()]]
+    for table in tables:
+        table_data = table[0][0]
+        title = table[0][1]
+        print(create_table(table_data, title))
 
 
 if __name__ == "__main__":
