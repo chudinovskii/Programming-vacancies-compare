@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from itertools import count
 from terminaltables import AsciiTable
 
-langs = ['Javascript', 'Java', 'Python', 'Ruby', 'PHP', 'C++', 'C#', 'C', 'Go']
+LANGS = ['Javascript', 'Java', 'Python', 'Ruby', 'PHP', 'C++', 'C#', 'C', 'Go']
 
 
 def get_vacancies_hh(text, page=0, per_page=100):
@@ -24,7 +24,6 @@ def get_vacancies_hh(text, page=0, per_page=100):
 
 
 def get_vacancies_sj(text, page=0, count=100):
-    load_dotenv()
     url = 'https://api.superjob.ru/2.0/vacancies/'
     headers = {
         'X-Api-App-Id': os.getenv('SUPERJOB_SECRET_KEY')
@@ -83,78 +82,91 @@ def predict_rub_salary_sj(vacancy):
     return avg_salary
 
 
-def get_hh_vacancies_stats_by_lang():
+def get_hh_vacancies_stats_by_lang(text):
+    pages = []
+
+    for page in count(0):
+        decoded_resp = get_vacancies_hh(text, page)
+        pages.append(decoded_resp['items'])
+        if page >= decoded_resp['pages']:
+            vacancies_found = decoded_resp['found']
+            break
+
+    vacancies_processed = 0
+    average_salary = 0
+
+    for page in pages:
+        for vacancy in page:
+            salary = predict_rub_salary_hh(vacancy)
+            if salary is not None:
+                vacancies_processed += 1
+                average_salary += salary
+    average_salary = int(average_salary / vacancies_processed)
+
+    return vacancies_found, vacancies_processed, average_salary
+
+
+def get_sj_vacancies_stats_by_lang(text):
+    pages = []
+
+    for page in count(0):
+        decoded_resp = get_vacancies_sj(text, page)
+        pages.append(decoded_resp['objects'])
+        if not decoded_resp['more']:
+            vacancies_found = decoded_resp['total']
+            break
+        else:
+            continue
+
+    vacancies_processed = 0
+    average_salary = 0
+
+    for page in pages:
+        for vacancy in page:
+            salary = predict_rub_salary_sj(vacancy)
+            if salary is not None:
+                vacancies_processed += 1
+                average_salary += salary
+        average_salary = int(average_salary / vacancies_processed)
+
+    return vacancies_found, vacancies_processed, average_salary
+
+
+def get_all_hh_prog_vacancies_stats():
     title = 'HeadHunter Moscow'
-    TABLE_DATA = [
+    table_data = [
         ['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']
     ]
-
-    for lang in langs:
+    for lang in LANGS:
         text = 'Программист ' + lang
-        pages = []
-
-        for page in count(0):
-            decoded_resp = get_vacancies_hh(text, page)
-            pages.append(decoded_resp['items'])
-            if page >= decoded_resp['pages']:
-                vacancies_found = decoded_resp['found']
-                break
-
-        vacancies_processed = 0
-        average_salary = 0
-
-        for page in pages:
-            for vacancy in page:
-                salary = predict_rub_salary_hh(vacancy)
-                if salary is not None:
-                    vacancies_processed += 1
-                    average_salary += salary
-        average_salary = int(average_salary / vacancies_processed)
-
-        TABLE_DATA.append([lang, vacancies_found, vacancies_processed, average_salary])
-
-    table_instance = AsciiTable(TABLE_DATA, title)
-    print(table_instance.table)
+        vacancies_found, vacancies_processed, average_salary = get_hh_vacancies_stats_by_lang(text)
+        table_data.append([lang, vacancies_found, vacancies_processed, average_salary])
+    return table_data, title
 
 
-def get_sj_vacancies_stats_by_lang():
+def get_all_sj_prog_vacancies_stats():
     title = 'SuperJob Moscow'
-    TABLE_DATA = [
+    table_data = [
         ['Язык программирования', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата']
     ]
-    for lang in langs:
+    for lang in LANGS:
         text = 'Программист ' + lang
-        pages = []
+        vacancies_found, vacancies_processed, average_salary = get_sj_vacancies_stats_by_lang(text)
+        table_data.append([lang, vacancies_found, vacancies_processed, average_salary])
+    return table_data, title
 
-        for page in count(0):
-            decoded_resp = get_vacancies_sj(text, page)
-            pages.append(decoded_resp['objects'])
-            if not decoded_resp['more']:
-                vacancies_found = decoded_resp['total']
-                break
-            else:
-                continue
 
-        vacancies_processed = 0
-        average_salary = 0
-
-        for page in pages:
-            for vacancy in page:
-                salary = predict_rub_salary_sj(vacancy)
-                if salary is not None:
-                    vacancies_processed += 1
-                    average_salary += salary
-        average_salary = int(average_salary / vacancies_processed)
-
-        TABLE_DATA.append([lang, vacancies_found, vacancies_processed, average_salary])
-
-    table_instance = AsciiTable(TABLE_DATA, title)
-    print(table_instance.table)
+def create_table(table_data, title):
+    table_instance = AsciiTable(table_data, title)
+    return table_instance.table
 
 
 def main():
-    get_hh_vacancies_stats_by_lang()
-    get_sj_vacancies_stats_by_lang()
+    load_dotenv()
+    table_data, title = get_all_sj_prog_vacancies_stats()
+    print(create_table(table_data, title))
+    table_data, title = get_all_hh_prog_vacancies_stats()
+    print(create_table(table_data, title))
 
 
 if __name__ == "__main__":
